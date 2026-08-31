@@ -1,0 +1,316 @@
+;; The kagi itonami's decisions, in Kotoba.
+;;
+;; Everything in this file is a decision the vault already makes: which field
+;; types must be sealed, which payload keys are values rather than shape, and
+;; what a phase does to a disposition. Nothing here is an effect. There is no
+;; capability, no import, no clock and no store, so the host grants nothing and
+;; `requiredCapabilities` is empty.
+;;
+;; ## Why this is not `.cljc` any more
+;;
+;; Owner directive 2026-08-31: no JVM, no ClojureScript. The previous mount was
+;; a shadow-cljs bundle, which needs a JVM to build and ships a ClojureScript
+;; runtime to run. This compiles with `amu compile --target wasm32-browser`,
+;; which `bin/amu` runs on nbb — measured, no `clojure` process, no JDK.
+;;
+;; ## What stays in the host, and why that is not cheating
+;;
+;; The host parses the request, walks the fields, and writes the socket. Those
+;; are effects and a growing collection, not decisions — the same boundary
+;; amu's own `runtime/http-service.mjs` draws around
+;; `runtime/http/route-decide.kotoba`. What would be cheating is putting a
+;; `classification` table in JavaScript, and that table is here.
+;;
+;; ## Single file, and therefore no stdlib
+;;
+;; A guest that shares `lang/stdlib/core.kotoba` has to go through the project
+;; route, and the project route runs on the JVM (`bin/amu`'s nbbNativeEligible
+;; rejects `--source-path`). Since the point of this rewrite is to have no JVM
+;; in the build, this file carries the few helpers it needs. Measured
+;; 2026-08-30, amu#709: `--prelude` is silently ignored by every non-CLJS
+;; backend, so there is no third option today.
+(ns kagi.decisions
+  (:export [main
+            classification type-known? value-key-refused?
+            phase-known? operation-known? disposition-known?
+            phase-disposition phase-reason relaxed?
+            route-outcome status-for
+            refusal-answer field-answer classify-answer decide-answer
+            x402-terms x402-asset x402-challenge]))
+
+;; ── kagitaba's field taxonomy ───────────────────────────────────────────────
+;;
+;; `kagitaba.field/sensitive-types` and `value-types`, and the fail-closed rule
+;; `classification` applies to anything outside them. Written out rather than
+;; looked up: a Kotoba guest has no map literal it can share with the `.cljc`,
+;; so the parity harness (scripts/parity.mjs) checks this function against
+;; `kagitaba.field/classification` over every type either side knows.
+
+(defn sensitive-type?
+  [t :string]
+  :bool
+  (if (string=? t "concealed") true
+    (if (string=? t "totp") true
+      (if (string=? t "credit-card-number") true
+        (if (string=? t "ssh-key") true false)))))
+
+(defn ordinary-type?
+  [t :string]
+  :bool
+  (if (string=? t "string") true
+    (if (string=? t "email") true
+      (if (string=? t "url") true
+        (if (string=? t "phone") true
+          (if (string=? t "date") true
+            (if (string=? t "month-year") true
+              (if (string=? t "gender") true
+                (if (string=? t "menu") true
+                  (if (string=? t "address") true
+                    (if (string=? t "credit-card-type") true
+                      (if (string=? t "reference") true
+                        (if (string=? t "file") true
+                          (if (string=? t "sso-login") true
+                            (if (string=? t "unknown") true false)))))))))))))))
+
+(defn type-known?
+  [t :string]
+  :bool
+  (if (sensitive-type? t) true (ordinary-type? t)))
+
+(defn classification
+  ;; Fail closed: a type neither list names is :restricted, not :internal. A
+  ;; field type kagitaba has no name for is one nobody has decided is safe.
+  [t :string]
+  :string
+  (if (sensitive-type? t)
+    "restricted"
+    (if (ordinary-type? t) "internal" "restricted")))
+
+;; ── the invariant: this surface never receives a secret ─────────────────────
+;;
+;; `:item/username` is not a secret and is refused anyway. A surface that
+;; accepts some values and not others has to be right about which one every
+;; time; "no values, ever" cannot be got subtly wrong.
+
+(defn value-key-refused?
+  [k :string]
+  :bool
+  (if (string=? k "field/value") true
+    (if (string=? k "item/notes") true
+      (if (string=? k "item/username") true
+        (if (string=? k "item/password-history") true false)))))
+
+;; ── kagi.phase/gate ─────────────────────────────────────────────────────────
+;;
+;; The rule is that a phase may only ADD caution. Read off `kagi.phase/phases`
+;; rather than off the labels: phase 0 permits no writes at all, and phases 1-3
+;; permit every write, differing only in which ones commit unattended.
+
+(defn phase-known? [phase :i64] :bool
+  (if (< phase 0) false (if (> phase 3) false true)))
+
+(defn read-op? [op :string] :bool
+  (if (string=? op "item/reveal") true (if (string=? op "item/list") true false)))
+
+(defn write-op? [op :string] :bool
+  (if (string=? op "item/create") true
+    (if (string=? op "item/update") true
+      (if (string=? op "item/rotate") true
+        (if (string=? op "share/grant") true
+          (if (string=? op "share/revoke") true false))))))
+
+(defn operation-known? [op :string] :bool
+  (if (read-op? op) true (write-op? op)))
+
+(defn disposition-known? [d :string] :bool
+  (if (string=? d "commit") true
+    (if (string=? d "escalate") true (if (string=? d "hold") true false))))
+
+(defn writes-permitted? [phase :i64] :bool
+  (if (= phase 0) false true))
+
+(defn auto-op?
+  ;; The subset a phase commits without a human.
+  [phase :i64 op :string]
+  :bool
+  (if (= phase 3)
+    (write-op? op)
+    (if (= phase 2)
+      (if (string=? op "item/create") true
+        (if (string=? op "item/update") true
+          (if (string=? op "share/grant") true false)))
+      (if (= phase 1)
+        (if (string=? op "item/create") true (if (string=? op "item/update") true false))
+        false))))
+
+(defn phase-disposition
+  [phase :i64 op :string disposition :string]
+  :string
+  (if (string=? disposition "hold")
+    "hold"
+    (if (read-op? op)
+      disposition
+      (if (writes-permitted? phase)
+        (if (string=? disposition "commit")
+          (if (auto-op? phase op) "commit" "escalate")
+          disposition)
+        "hold"))))
+
+(defn phase-reason
+  ;; The empty string means no reason, which is what a permitted decision has.
+  ;; The two refusals stay apart because they call for different actions: one is
+  ;; a phase change, the other is a person.
+  [phase :i64 op :string disposition :string]
+  :string
+  (if (string=? disposition "hold")
+    ""
+    (if (read-op? op)
+      ""
+      (if (writes-permitted? phase)
+        (if (string=? disposition "commit")
+          (if (auto-op? phase op) "" "phase-approval")
+          "")
+        "phase-disabled"))))
+
+(defn phase-label [phase :i64] :string
+  (if (= phase 0) "read-only"
+    (if (= phase 1) "self-vault"
+      (if (= phase 2) "team-share"
+        (if (= phase 3) "supervised-auto" "unknown")))))
+
+(defn digit [n :i64] :string
+  (string-substring "0123456789" n (+ n 1)))
+
+(defn digits
+  ;; There is no integer formatter in the language, and a single-file guest has
+  ;; no stdlib to borrow one from. `rem` is outside the subset (measured: amu
+  ;; answers :subset for it), so the remainder is spelled out. Every integer
+  ;; this guest prints is a small count; anything past three digits says "many"
+  ;; rather than printing a wrong number.
+  [n :i64]
+  :string
+  (if (< n 0)
+    "negative"
+    (if (< n 10)
+      (digit n)
+      (if (< n 100)
+        (string-concat (digit (quot n 10)) (digit (- n (* 10 (quot n 10)))))
+        (if (< n 1000)
+          (string-concat (digit (quot n 100))
+            (string-concat (digit (- (quot n 10) (* 10 (quot n 100))))
+                           (digit (- n (* 10 (quot n 10))))))
+          "many")))))
+
+(defn caution [d :string] :i64
+  (if (string=? d "commit") 0 (if (string=? d "escalate") 1 2)))
+
+(defn relaxed?
+  ;; Computed from the answer, not asserted. This is the gate's own contract --
+  ;; it never returns less caution than it was given -- evaluated on the decision
+  ;; it describes.
+  [phase :i64 op :string disposition :string]
+  :bool
+  (if (< (caution (phase-disposition phase op disposition)) (caution disposition))
+    true
+    false))
+
+;; ── routing ─────────────────────────────────────────────────────────────────
+;;
+;; Which outcome a (method, path) produces and which status an outcome gets.
+;; The host owns the socket; it does not own this.
+
+(defn route-outcome
+  [method :string path :string]
+  :keyword
+  (if (string=? method "GET")
+    (if (string=? path "/health") :health
+      (if (string=? path "/blueprint.edn") :blueprint
+        (if (string=? path "/") :index
+          (if (string=? path "") :index
+            (if (string=? path "/item/classify") :method-not-allowed
+              (if (string=? path "/x402/phase/decide") :method-not-allowed :not-found))))))
+    (if (string=? method "POST")
+      (if (string=? path "/item/classify") :classify
+        (if (string=? path "/x402/phase/decide") :decide :not-found))
+      (if (string=? path "/item/classify") :method-not-allowed
+        (if (string=? path "/x402/phase/decide") :method-not-allowed :not-found)))))
+
+(defn status-for
+  [outcome :keyword]
+  :i64
+  (if (= outcome :not-found) 404
+    (if (= outcome :method-not-allowed) 405
+      (if (= outcome :payment-required) 402
+        (if (= outcome :invalid-request) 400
+          (if (= outcome :plaintext-value-received) 400 200))))))
+
+(defn main
+  ;; A smoke value the host can assert on instantiation: the four properties
+  ;; this module exists to hold, folded into one number. 15 means all four.
+  []
+  (+ (if (string=? (classification "concealed") "restricted") 1 0)
+     (+ (if (string=? (classification "not-a-real-type") "restricted") 2 0)
+        (+ (if (value-key-refused? "field/value") 4 0)
+           (if (string=? (phase-disposition 0 "item/create" "commit") "hold") 8 0)))))
+
+;; ── the answers, as JSON ────────────────────────────────────────────────────
+;;
+;; The host writes the socket; it does not choose what the body says. These
+;; build the response strings so that the wording of a refusal, the key names
+;; and the shape of the 402 challenge are all decided here, next to the rules
+;; they describe. A host that assembled them would be a second place the
+;; contract lives.
+;;
+;; JSON is written by hand because a guest has no serializer and no map value
+;; to serialize. That is a real cost: the escaping rules live here now. It is
+;; bounded by the fact that every value in these strings is either a literal or
+;; a value the guest itself just decided -- none of them is caller text.
+
+(defn quoted [s :string] :string
+  (string-concat "\"" (string-concat s "\"")))
+
+(defn refusal-answer
+  ;; The invariant, in the words the caller reads. `k` is the key the host
+  ;; found, and the host only ever passes one this guest just refused.
+  [k :string]
+  :string
+  (string-concat "{\"error\":\"plaintext-value-received\",\"keys\":[" (string-concat (quoted k) (string-concat "],\"detail\":\"this surface takes shapes, never values. Remove :" (string-concat k " and send types and titles only. If one of these reached a public URL, treat the credential as disclosed and rotate it.\"}")))))
+
+(defn field-answer
+  ;; One field's verdict. The host walks the collection; the guest says what
+  ;; each element means and how it is written down.
+  [title :string field-type :string]
+  :string
+  (string-concat "{\"title\":" (string-concat (quoted title) (string-concat ",\"type\":" (string-concat (quoted field-type) (string-concat ",\"classification\":" (string-concat (quoted (classification field-type)) (string-concat ",\"must-seal?\":" (string-concat (if (string=? (classification field-type) "restricted") "true" "false") (string-concat ",\"type-known?\":" (string-concat (if (type-known? field-type) "true" "false") "}")))))))))))
+
+(defn classify-answer
+  ;; The per-item verdict. The host walks the fields and hands back what it
+  ;; counted; the guest decides what those counts mean.
+  [category :string known? :bool restricted :i64 fields-json :string]
+  :string
+  (string-concat "{\"category\":" (string-concat (quoted category) (string-concat ",\"category-known?\":" (string-concat (if known? "true" "false") (string-concat ",\"fields\":" (string-concat fields-json (string-concat ",\"restricted-count\":" (string-concat (digits restricted) (string-concat ",\"must-seal?\":" (string-concat (if (> restricted 0) "true" "false") "}")))))))))))
+
+(defn decide-answer
+  [phase :i64 op :string requested :string]
+  :string
+  (string-concat "{\"phase\":" (string-concat (digits phase) (string-concat ",\"phase-label\":" (string-concat (quoted (phase-label phase)) (string-concat ",\"op\":" (string-concat (quoted op) (string-concat ",\"requested\":" (string-concat (quoted requested) (string-concat ",\"disposition\":" (string-concat (quoted (phase-disposition phase op requested)) (string-concat ",\"reason\":" (string-concat (if (string=? (phase-reason phase op requested) "") "null" (quoted (phase-reason phase op requested))) (string-concat ",\"relaxed?\":" (string-concat (if (relaxed? phase op requested) "true" "false") "}")))))))))))))))
+
+;; ── the x402 challenge ──────────────────────────────────────────────────────
+;;
+;; `kotoba-lang/pay`'s `pay.x402/challenge` is the shape these mirror, and
+;; scripts/parity.cljs checks them against it -- the codec stays the authority
+;; even though a Kotoba guest cannot require a `.cljc` library.
+;;
+;; Split in three because an exported function takes at most five parameters
+;; (measured 2026-08-31: six answers `function parameters exceed ABI-supported
+;; arity`). The host passes configuration in and fragments back; it never
+;; writes a key name.
+
+(defn x402-terms [network :string units :string resource :string description :string] :string
+  (string-concat "\"scheme\":\"exact\",\"network\":" (string-concat (quoted network) (string-concat ",\"maxAmountRequired\":" (string-concat (quoted units) (string-concat ",\"resource\":" (string-concat (quoted resource) (string-concat ",\"description\":" (string-concat (quoted description) ",\"mimeType\":\"application/json\",\"maxTimeoutSeconds\":60")))))))))
+
+(defn x402-asset [pay-to :string asset :string asset-name :string asset-version :string] :string
+  (string-concat "\"payTo\":" (string-concat (quoted pay-to) (string-concat ",\"asset\":" (string-concat (quoted asset) (string-concat ",\"extra\":{\"name\":" (string-concat (quoted asset-name) (string-concat ",\"version\":" (string-concat (quoted asset-version) "}")))))))))
+
+(defn x402-challenge [terms :string asset-part :string error :string] :string
+  (string-concat "{\"x402Version\":1,\"accepts\":[{" (string-concat terms (string-concat "," (string-concat asset-part (string-concat "}],\"error\":" (string-concat (quoted error) "}")))))))

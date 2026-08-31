@@ -41,14 +41,15 @@ be got subtly wrong.
 | `GET /health` | liveness | free |
 | `GET /blueprint.edn` | the Open Business Blueprint | free |
 | `POST /item/classify` | which fields must be sealed before storage | **free** |
-| `POST /ledger/verify` | hash-chain check of an audit ledger | **free** |
 | `POST /x402/phase/decide` | one staged-rollout gate decision | USD 0.001 |
 
-**Classification and verification are free on purpose.** "Seal this before you
-store it" is the rule every consumer of the vault must honour; put a price on
-it and someone stores a credential in the clear rather than pay to be told not
-to. The same argument applies to checking your own audit trail: a ledger nobody
-can afford to verify is a ledger nobody verifies.
+**Classification is free on purpose.** "Seal this before you store it" is the
+rule every consumer of the vault must honour; put a price on it and someone
+stores a credential in the clear rather than pay to be told not to.
+
+Bodies are **JSON**, not EDN. The first version of this mount read EDN with
+`cljs.reader`; there is no ClojureScript here any more, and hand-writing an EDN
+reader to sit in front of a vault surface is not a trade worth making.
 
 ## Why the caller's own sensitivity flag is not trusted
 
@@ -61,19 +62,41 @@ never set — an absent flag and a considered "no" are the same bytes. So
 for, and reports a caller's contradicting flag as a `:disagreements` entry
 rather than obeying or silently overwriting it.
 
-## What it refuses to answer
+## No JVM, and no ClojureScript
 
-A signed ledger. kagi's `:ledger/sig` is **hybrid** — Ed25519 *and* ML-DSA-65,
-sound only while both hold — and verifying it needs the actor's public bundle
-from the key registry. Checking only the Ed25519 half would look exactly like
-checking both, so a chain carrying signatures comes back as
+Owner directive 2026-08-31. The decisions live in `guest/decisions.kotoba`,
+compiled by `amu compile --target wasm32-browser` — a path `bin/amu` runs on
+nbb, so no JVM takes part in the build — and the Worker around it is a
+hand-written ES module. Nothing here is ClojureScript at build time or at run
+time. The compiled guest is about 7 KB of WebAssembly; the bundle it replaced
+was 445 KB of shadow-cljs output.
 
-```
-422 {:error :signed-ledger-needs-the-key-registry :signed-entries [1]}
-```
+**The guest decides; the host causes.** Every classification, every refusal,
+every phase-gate answer and every response body comes out of the Kotoba module.
+What stays in JavaScript is effects and growing collections: reading a socket,
+parsing a body, walking a list of fields, asking a payment facilitator. That is
+the boundary amu's own `runtime/http-service.mjs` draws around
+`runtime/http/route-decide.kotoba`.
 
-naming the entries responsible. This is not a gap to be closed by loosening the
-check; it is where custody is.
+Two things live in the host that are worth naming rather than hiding. The
+1Password **category list** is 114 entries that grow with someone else's
+product — a collection, not a decision — and a single-file Kotoba guest has no
+map to hold it. The **x402 asset facts** (USDC's address, name and version)
+used to be derived by `pay.x402`; a Kotoba guest cannot require a `.cljc`
+codec, so they are configuration in `wrangler.jsonc` and the guest writes only
+the shape around them. `npm run parity` checks the resulting challenge body
+against that codec, key by key, so the two cannot drift apart unnoticed.
+
+## What was withdrawn
+
+`POST /ledger/verify` is **gone**, not reimplemented. Verifying a kagi ledger
+means recomputing its hash chain, and there is no hash capability in any of
+amu's fourteen capability kits at any backend face (measured 2026-08-31).
+Writing kagi's canonicalisation again in JavaScript would be the second
+implementation that drifts from the vault — the exact failure this mount exists
+to avoid — so the check stays where the ledger and the key registry are. The
+blueprint records it under `:itonami.blueprint/withdrawn` with the condition
+that would bring it back.
 
 ## The phase gate is what is sold
 

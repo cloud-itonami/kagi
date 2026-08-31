@@ -5,3 +5,7 @@ node_modules/
 .cpcache/
 .clj-kondo/.cache/
 .wrangler/
+guest/decisions.wasm.provenance.edn
+guest/decisions.wasm.publication.edn
+guest/decisions.wasm.mjs
+worker/vendor/

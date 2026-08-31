@@ -1,0 +1,7 @@
+dist/
+.shadow-cljs/
+node_modules
+node_modules/
+.cpcache/
+.clj-kondo/.cache/
+.wrangler/

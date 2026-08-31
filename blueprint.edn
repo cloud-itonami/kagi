@@ -1,0 +1,75 @@
+{:itonami.blueprint/id "kagi"
+ :itonami.blueprint/name "Kagi — the key-less half of a governed vault"
+ :itonami.blueprint/domain :security/secrets-governance
+ :itonami.blueprint/license "Apache-2.0"
+ :itonami.blueprint/social-impact [:data-sovereignty :self-hosting :post-quantum]
+ :itonami.blueprint/governor :access-governor
+ :itonami.blueprint/robotics false
+ :itonami.blueprint/required-technologies [:identity :audit-ledger :payments]
+ :itonami.blueprint/graph :langgraph-stategraph
+ :itonami.blueprint/ledger :append-only
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/phase-default 0
+ :itonami.blueprint/keying :function
+ :itonami.blueprint/isic "6209"
+ :itonami.blueprint/adr "2608312200-kagi-itonami-mount-never-receives-a-secret"
+
+ ;; :partial, and the boundary is the whole design. The engine
+ ;; (kotoba-lang/kagi + kotoba-lang/kagitaba) holds custody: unlock, VMK,
+ ;; compartment keys, per-item DEKs, hybrid signing. What this mount exposes is
+ ;; the subset that needs no key and receives no secret — a phase-gate
+ ;; decision, a hash-chain check, and the field taxonomy that says what must be
+ ;; sealed before it is stored. Custody is not partially deployed here; it is
+ ;; absent by construction.
+ :itonami.blueprint/maturity :partial
+
+ :itonami.blueprint/mount "/kagi"
+ :itonami.blueprint/endpoint "https://app.itonami.cloud/kagi"
+ :itonami.blueprint/engine
+ {:vault "https://github.com/kotoba-lang/kagi"
+  :item-model "https://github.com/kotoba-lang/kagitaba"}
+
+ ;; The invariant this actor is built around, stated where a reader looks
+ ;; first: IT NEVER RECEIVES A SECRET. No passphrase, no DEK, no plaintext
+ ;; field value. /item/classify refuses a payload carrying :field/value rather
+ ;; than stripping it, because a caller who sent one needs to know they did.
+ :itonami.blueprint/invariant
+ "never receives a secret: no unlock material, no key, no plaintext value"
+
+ :itonami.blueprint/sells
+ [{:resource "/x402/phase/decide"
+   :unit :one-phase-gate-decision
+   :what "the staged-rollout gate applied to one (phase, operation,
+          disposition) triple. The gate may only ADD caution: a phase can turn
+          :commit into :escalate or :hold, and can never turn :hold into
+          :commit. Returns the corrected disposition and the named reason
+          (:phase-disabled / :phase-approval)."
+   :usd "0.001"}]
+
+ :itonami.blueprint/free
+ [{:resource "/item/classify"
+   :what "which fields of an item shape are restricted and must be sealed
+          before storage, derived from kagitaba's value-type taxonomy rather
+          than from the caller's own :field/sensitive? flag"
+   :why "this is the rule every consumer of the vault must honour before it
+         writes anything. Charging for it means someone stores a credential in
+         the clear because they did not want to pay to be told not to."}
+  {:resource "/ledger/verify"
+   :what "hash-chain verification of an append-only audit ledger"
+   :why "charging to check whether your own audit trail is intact prices the
+         one action that protects the holder. A ledger nobody can afford to
+         check is a ledger nobody checks."}
+  {:resource "/health"}
+  {:resource "/blueprint.edn"}]
+
+ :itonami.blueprint/procures
+ {:from :none
+  :why "this actor's cost of goods is its own computation. It reads no store,
+        holds no key, and calls no model."}
+
+ :itonami.blueprint/x402
+ {:facilitator "https://x402.nexus"
+  :seller "kagi"
+  :asset "USDC"
+  :network "base"
+  :settlement :nexus-x402}}

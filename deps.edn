@@ -1,0 +1,38 @@
+{:paths ["src" "resources"]
+ ;; The engines are kotoba-lang/kagi (vault actor: crypto, governor, phase
+ ;; gate, ledger) and kotoba-lang/kagitaba (the 1Password-shaped item model).
+ ;; This repository consumes `kagi.phase`, `kagi.ledger` and `kagitaba.*` —
+ ;; pure .cljc, no I/O, no store, no key — and adds nothing to them. A second
+ ;; reading of the taxonomy or of the gate at the edge would be a weaker copy
+ ;; that drifts from the one the AccessGovernor censors proposals with.
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        io.github.kotoba-lang/kagi
+        {:git/url "https://github.com/kotoba-lang/kagi.git"
+         :git/sha "28262aa6de9eba410fbfb6b149e24bbf2811dac0"}
+        io.github.kotoba-lang/kagitaba
+        {:git/url "https://github.com/kotoba-lang/kagitaba.git"
+         :git/sha "47212f497d9665a96f23429ea8deee13f4eda4a9"}
+        ;; x402 codec: the 402 challenge body and the payment-payload shape.
+        ;; Shared with the facilitator so seller and facilitator agree by
+        ;; sharing a codec rather than by two readings of one spec.
+        io.github.kotoba-lang/pay
+        {:git/url "https://github.com/kotoba-lang/pay.git"
+         :git/sha "6e72321b1c708dd8a9481b276a4060e1b4bb806f"}
+        io.github.kotoba-lang/jp-go-digital-design-system
+        {:git/url "https://github.com/kotoba-lang/jp-go-digital-design-system.git"
+         :git/sha "94ffae44a8e248b196b7d0b8a692f0645c9d34b1"}
+        io.github.kotoba-lang/html
+        {:git/url "https://github.com/kotoba-lang/html.git"
+         :git/sha "e3794928c981243f626dce0d506cfc39916c7756"}}
+ :aliases
+ {;; The Worker build. shadow-cljs reads :deps through this alias, and the
+  ;; macro in kagi.itonami.inline needs jp-go-dds on the classpath at *compile*
+  ;; time to inline dds.css into the bundle.
+  :cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
+                      thheller/shadow-cljs {:mvn/version "2.28.20"}}}
+  :test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]}
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test" "--fail-level" "error"]}}}

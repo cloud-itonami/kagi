@@ -1,0 +1,16 @@
+{
+  "name": "cloud-itonami-kagi",
+  "private": true,
+  "comment": "shadow-cljs compiles src/kagi/itonami/worker.cljs -> dist/worker.js, served at app.itonami.cloud/kagi through itonami-fleet-dispatch. dds.css is inlined at compile time. @noble/hashes is here because kagi.digest's :cljs branch takes SHA-256 from it, and kagi.ledger's chain check is that hash.",
+  "dependencies": {
+    "@noble/hashes": "^2.2.0"
+  },
+  "devDependencies": {
+    "shadow-cljs": "^2.28.20",
+    "wrangler": "^4.69.0"
+  },
+  "scripts": {
+    "build": "shadow-cljs release worker",
+    "ship": "wrangler deploy --dispatch-namespace ai-gftd-repository-dispatch"
+  }
+}

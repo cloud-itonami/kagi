@@ -23,9 +23,17 @@ machine. This surface holds no unlock material, no VMK, no compartment key and
 no DEK, and it refuses to be handed one:
 
 ```
-POST /item/classify   {:item {... :field/value "hunter2"}}
-  -> 400 {:error :plaintext-value-received :keys [:field/value]}
+POST /item/classify
+  {"item": {"item/sections": [{"section/fields":
+     [{"field/title": "password", "field/type": "concealed",
+       "field/value": "hunter2"}]}]}}
+  -> 400 {"error": "plaintext-value-received", "keys": ["field/value"]}
 ```
+
+Fields are read at `item/sections[] -> section/fields[]` and nowhere else, so a
+body that puts them somewhere else is answered with `200 {"fields": []}` — no
+field seen, therefore no value seen. Correct, and indistinguishable from the
+refusal being broken; `docs/operator-quickstart.md` §5 shows how to tell.
 
 Refused rather than stripped, because a caller who has just sent a password to
 a public URL needs to know they did — a 200 with the value quietly dropped
@@ -115,17 +123,30 @@ the gate's contract evaluated on the decision it describes.
 ## Build, test, ship
 
 ```bash
-npm install
-npm run build     # shadow-cljs release worker -> dist/worker.js
+npm ci            # reproducible install; nbb and wrangler, no JVM
+npm run build     # amu compile guest/decisions.kotoba -> guest/decisions.wasm
+npm run parity    # the guest against the vault's own .cljc, input by input
 npm run ship      # uploads into the ai-gftd-repository-dispatch namespace
-npx nbb --classpath "src:test:../../kotoba-lang/kagi/src:../../kotoba-lang/kagitaba/src" \
-    test/run_tests.cljs
 ```
 
-The tests are `.cljc` and run on both hosts; nbb is the fast path and needs no
-dependency resolution (26 tests, 118 assertions). `dds.css` and `blueprint.edn`
-are inlined at compile time by `kagi.itonami.inline` — a missing one is a build
-failure, not an endpoint that quietly serves nothing.
+`npm run parity` is the test suite: 322 comparisons, exit 1 on the first
+disagreement with the input and both answers named. There is no `test/`
+directory and no test runner — the check that matters here is not "does the
+wrapper behave" but "does the guest still answer what the vault answers", and
+that is a comparison, not an assertion.
+
+`guest/decisions.wasm` is committed, so the build is its own check: rebuild and
+`git status --porcelain guest/decisions.wasm` should stay silent. Anything else
+means the committed guest and the `.kotoba` source disagree. `dds.css` and
+`blueprint.edn` are vendored into `worker/vendor/` by `scripts/build-guest.cljs`
+from their west pins — a missing one is a build failure, not an endpoint that
+quietly serves nothing.
+
+Both the build and the parity check resolve siblings through `../../kotoba-lang/`,
+so they only run from the repository's place in the superproject.
+**[`docs/operator-quickstart.md`](docs/operator-quickstart.md)** has the whole
+path with the outputs to expect, how to run it locally, and how to confirm the
+refusal yourself.
 
 ## ADR
 

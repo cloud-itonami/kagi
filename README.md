@@ -148,6 +148,26 @@ so they only run from the repository's place in the superproject.
 path with the outputs to expect, how to run it locally, and how to confirm the
 refusal yourself.
 
+## Regulatory sources
+
+`facts.edn` is the register of authorities this repository's cryptographic
+claims rest on — NIST SP 800-57 / SP 800-131A / FIPS 203, OWASP's
+Cryptographic Storage Cheat Sheet, the CRYPTREC e-government cipher list and
+RFC 9180 (HPKE) — plus a measured `:host-behaviour` entity per host. It is
+tx-data: every entry carries a `:source/verify` tag naming the check that
+establishes it, and no citation is here that the verifier has not re-fetched.
+
+```bash
+nbb scripts/verify-facts.cljs            # re-fetches every source; 0/1/2
+nbb scripts/mutation-check.cljs          # 14 structural mutations, no network
+nbb scripts/mutation-check.cljs --network  # + 6 paced fetching mutations
+```
+
+Exit 2 means *the run could not answer* — unreachable host, bot challenge,
+non-discriminating self-test — and is neither a pass nor a register error.
+The register's `:coverage/not-covered` entity says what it deliberately does
+not assert: document bodies, algorithm parameters, conformance claims.
+
 ## ADR
 
 `90-docs/adr/2608312200-kagi-itonami-mount-never-receives-a-secret.edn` in the

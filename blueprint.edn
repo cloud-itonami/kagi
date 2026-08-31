@@ -36,6 +36,30 @@
  :itonami.blueprint/invariant
  "never receives a secret: no unlock material, no key, no plaintext value"
 
+ ;; The decisions are compiled Kotoba, not ClojureScript (owner directive
+ ;; 2026-08-31). `guest/decisions.kotoba` -> `amu compile --target
+ ;; wasm32-browser`, run on nbb: no JVM builds this actor and no ClojureScript
+ ;; runs inside it. The Worker around it is a hand-written ES module that owns
+ ;; the socket, the body and the walk, and decides nothing.
+ :itonami.blueprint/implementation
+ {:language :kotoba
+  :target :wasm32-browser-kotoba-v1
+  :host :hand-written-esm
+  :jvm? false
+  :clojurescript? false
+  :capabilities []}
+
+ ;; Withdrawn 2026-08-31 rather than reimplemented. Verifying a kagi ledger
+ ;; means recomputing its hash chain, and there is no hash capability in any
+ ;; of amu's 14 capability kits at any backend face. Writing kagi's
+ ;; canonicalisation again in JavaScript would be the second implementation
+ ;; that drifts from the vault -- the exact failure this mount exists to avoid
+ ;; -- so the check stays where the ledger and the key registry are.
+ :itonami.blueprint/withdrawn
+ [{:resource "/ledger/verify"
+   :why :no-hash-capability-and-canonicalisation-belongs-to-the-vault
+   :restore-when "a hash capability is qualified for the wasm-aot face"}]
+
  :itonami.blueprint/sells
  [{:resource "/x402/phase/decide"
    :unit :one-phase-gate-decision
@@ -54,11 +78,6 @@
    :why "this is the rule every consumer of the vault must honour before it
          writes anything. Charging for it means someone stores a credential in
          the clear because they did not want to pay to be told not to."}
-  {:resource "/ledger/verify"
-   :what "hash-chain verification of an append-only audit ledger"
-   :why "charging to check whether your own audit trail is intact prices the
-         one action that protects the holder. A ledger nobody can afford to
-         check is a ledger nobody checks."}
   {:resource "/health"}
   {:resource "/blueprint.edn"}]
 

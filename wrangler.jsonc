@@ -1,6 +1,6 @@
 {
   "name": "kagi",
-  "main": "dist/worker.js",
+  "main": "worker/index.mjs",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
@@ -15,14 +15,29 @@
   // repository name and blueprint.edn's :itonami.blueprint/mount says "/kagi".
   // Those three agree by being the same string, not by a table.
   //
-  // No secrets, and no vault. This surface classifies shapes, checks hash
-  // chains and applies the phase gate; unlock material, the VMK, compartment
-  // keys and per-item DEKs never leave the owner's machine. There is nothing
-  // here for a compromise of this Worker to read.
+  // No secrets, and no vault. This surface classifies shapes and applies the
+  // phase gate; unlock material, the VMK, compartment keys and per-item DEKs
+  // never leave the owner's machine. There is nothing here for a compromise of
+  // this Worker to read.
+  //
+  // The bundle is a hand-written ES module host around a WebAssembly guest
+  // compiled from `guest/decisions.kotoba`. No JVM builds it and no
+  // ClojureScript runs in it (owner directive 2026-08-31).
+  // The price and the asset facts. These used to be derived inside the Worker
+  // by `pay.x402/payment-requirements`; a Kotoba guest cannot require a
+  // `.cljc` codec, so they are configuration here and the guest writes only
+  // the SHAPE around them. scripts/parity.cljs checks the resulting body
+  // against that codec so the two cannot drift apart unnoticed.
+  //
+  // X402_UNITS is USDC micros: 1000 = USD 0.001, the same number
+  // `pay.core/parse-usdc` produced.
   "vars": {
     "X402_FACILITATOR": "https://x402.nexus",
     "X402_PAY_TO": "0xA00366234D29d4F882088048c0B2fa0dB7302D4E",
     "X402_NETWORK": "base",
-    "X402_DECIDE_USD": "0.001"
+    "X402_UNITS": "1000",
+    "X402_ASSET": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "X402_ASSET_NAME": "USD Coin",
+    "X402_ASSET_VERSION": "2"
   }
 }

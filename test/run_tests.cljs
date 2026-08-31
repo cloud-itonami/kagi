@@ -9,6 +9,7 @@
   (:require [cljs.test :as t]
             [kagi.itonami.classify-test]
             [kagi.itonami.decide-test]
+            [kagi.itonami.json-test]
             [kagi.itonami.ledger-test]))
 
 (defmethod t/report [::t/default :end-run-tests] [m]
@@ -18,4 +19,5 @@
 
 (t/run-tests 'kagi.itonami.classify-test
              'kagi.itonami.decide-test
+             'kagi.itonami.json-test
              'kagi.itonami.ledger-test)

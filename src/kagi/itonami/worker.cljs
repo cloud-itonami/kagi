@@ -20,6 +20,7 @@
             [kagi.itonami.classify :as classify]
             [kagi.itonami.decide :as decide]
             [kagi.itonami.gate :as gate]
+            [kagi.itonami.json :as json]
             [kagi.itonami.ledger :as ledger]
             [kagi.itonami.view :as view])
   (:require-macros [kagi.itonami.inline :refer [inline-file inline-resource]]))
@@ -31,7 +32,11 @@
 (def max-body-bytes (* 256 1024))
 
 (defn- json-response [body status]
-  (js/Response. (js/JSON.stringify (clj->js body))
+  ;; `json/jsonable` first, because `clj->js` renders a keyword with `name` and
+  ;; drops its namespace — the refusal that names `:field/value` would arrive
+  ;; as "value", and `:item/update` and `:share/update` would arrive
+  ;; identical.
+  (js/Response. (js/JSON.stringify (clj->js (json/jsonable body)))
                 #js {:status status
                      :headers #js {"content-type" "application/json"
                                    "cache-control" "no-store"}}))

@@ -2,8 +2,8 @@
 ;; Breaks facts.edn one way at a time and requires verify-facts.cljs to object
 ;; FOR THE REASON IT NAMES.
 ;;
-;;   nbb scripts/mutation-check.cljs              (structural only -- no network)
-;;   nbb scripts/mutation-check.cljs --network    (also the fetching branches)
+;;   nbb scripts/mutation-check.cljk              (structural only -- no network)
+;;   nbb scripts/mutation-check.cljk --network    (also the fetching branches)
 ;;
 ;; WHY THE REASON AND NOT THE COLOUR.
 ;; A negative test that asserts only "the run went red" counts a run that went
@@ -41,7 +41,7 @@
     (if (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)) default)))
 
 (def base-path (flag "--facts" "facts.edn"))
-(def verifier-path (flag "--verifier" "scripts/verify-facts.cljs"))
+(def verifier-path (flag "--verifier" "scripts/verify-facts.cljk"))
 (def only (let [v (flag "--only" nil)]
             (when v (into #{} (str/split v #",")))))
 

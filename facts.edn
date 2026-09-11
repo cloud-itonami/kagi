@@ -15,7 +15,7 @@
 ;; spec-basis for this repository -- extend the table, never invent an id or
 ;; a URL.
 ;;
-;; VERIFIED BY `nbb scripts/verify-facts.cljs`, which re-fetches every entry.
+;; VERIFIED BY `nbb scripts/verify-facts.cljk`, which re-fetches every entry.
 ;; Each carries a :source/verify tag naming WHICH check establishes it:
 ;;   :page-identity  2xx, final URL still the page asked for, declared
 ;;                   charset, and the <title> recorded below.

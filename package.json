@@ -1,14 +1,14 @@
 {
   "name": "cloud-itonami-kagi",
   "private": true,
-  "comment": "A hand-written ES module Worker around a Kotoba guest. scripts/build-guest.cljs compiles guest/decisions.kotoba with amu --target wasm32-browser (nbb, no JVM) and vendors the pinned browser host and dds.css into worker/vendor/. No shadow-cljs, no ClojureScript, no JVM.",
+  "comment": "A hand-written ES module Worker around a Kotoba guest. scripts/build-guest.cljk compiles guest/decisions.kotoba with amu --target wasm32-browser (nbb, no JVM) and vendors the pinned browser host and dds.css into worker/vendor/. No shadow-cljs, no ClojureScript, no JVM.",
   "devDependencies": {
     "nbb": "^1.3.196",
     "wrangler": "^4.69.0"
   },
   "scripts": {
-    "build": "nbb scripts/build-guest.cljs",
-    "parity": "nbb --classpath \"../../kotoba-lang/kagi/src:../../kotoba-lang/kagitaba/src:../../kotoba-lang/pay/src\" scripts/parity.cljs",
+    "build": "nbb scripts/build-guest.cljk",
+    "parity": "nbb --classpath \"../../kotoba-lang/kagi/src:../../kotoba-lang/kagitaba/src:../../kotoba-lang/pay/src\" scripts/parity.cljk",
     "ship": "wrangler deploy --dispatch-namespace ai-gftd-repository-dispatch"
   }
 }

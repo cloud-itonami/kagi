@@ -298,7 +298,7 @@
 ;; ── the x402 challenge ──────────────────────────────────────────────────────
 ;;
 ;; `kotoba-lang/pay`'s `pay.x402/challenge` is the shape these mirror, and
-;; scripts/parity.cljs checks them against it -- the codec stays the authority
+;; scripts/parity.cljk checks them against it -- the codec stays the authority
 ;; even though a Kotoba guest cannot require a `.cljc` library.
 ;;
 ;; Split in three because an exported function takes at most five parameters

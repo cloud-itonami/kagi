@@ -138,7 +138,7 @@ that is a comparison, not an assertion.
 `guest/decisions.wasm` is committed, so the build is its own check: rebuild and
 `git status --porcelain guest/decisions.wasm` should stay silent. Anything else
 means the committed guest and the `.kotoba` source disagree. `dds.css` and
-`blueprint.edn` are vendored into `worker/vendor/` by `scripts/build-guest.cljs`
+`blueprint.edn` are vendored into `worker/vendor/` by `scripts/build-guest.cljk`
 from their west pins — a missing one is a build failure, not an endpoint that
 quietly serves nothing.
 
@@ -158,9 +158,9 @@ tx-data: every entry carries a `:source/verify` tag naming the check that
 establishes it, and no citation is here that the verifier has not re-fetched.
 
 ```bash
-nbb scripts/verify-facts.cljs            # re-fetches every source; 0/1/2
-nbb scripts/mutation-check.cljs          # 14 structural mutations, no network
-nbb scripts/mutation-check.cljs --network  # + 6 paced fetching mutations
+nbb scripts/verify-facts.cljk            # re-fetches every source; 0/1/2
+nbb scripts/mutation-check.cljk          # 14 structural mutations, no network
+nbb scripts/mutation-check.cljk --network  # + 6 paced fetching mutations
 ```
 
 Exit 2 means *the run could not answer* — unreachable host, bot challenge,

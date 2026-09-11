@@ -26,7 +26,7 @@
   // The price and the asset facts. These used to be derived inside the Worker
   // by `pay.x402/payment-requirements`; a Kotoba guest cannot require a
   // `.cljc` codec, so they are configuration here and the guest writes only
-  // the SHAPE around them. scripts/parity.cljs checks the resulting body
+  // the SHAPE around them. scripts/parity.cljk checks the resulting body
   // against that codec so the two cannot drift apart unnoticed.
   //
   // X402_UNITS is USDC micros: 1000 = USD 0.001, the same number

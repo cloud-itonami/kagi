@@ -7,8 +7,8 @@
     "wrangler": "^4.69.0"
   },
   "scripts": {
-    "build": "nbb scripts/build-guest.cljk",
-    "parity": "nbb --classpath \"../../kotoba-lang/kagi/src:../../kotoba-lang/kagitaba/src:../../kotoba-lang/pay/src\" scripts/parity.cljk",
+    "build": "kbb --backend sci scripts/build-guest.cljk",
+    "parity": "kbb --backend sci --classpath \"../../kotoba-lang/kagi/src:../../kotoba-lang/kagitaba/src:../../kotoba-lang/pay/src\" scripts/parity.cljk",
     "ship": "wrangler deploy --dispatch-namespace ai-gftd-repository-dispatch"
   }
 }

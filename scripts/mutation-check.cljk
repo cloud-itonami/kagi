@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Breaks facts.edn one way at a time and requires verify-facts.cljs to object
 ;; FOR THE REASON IT NAMES.
 ;;
-;;   nbb scripts/mutation-check.cljk              (structural only -- no network)
-;;   nbb scripts/mutation-check.cljk --network    (also the fetching branches)
+;;   kbb --backend sci scripts/mutation-check.cljk              (structural only -- no network)
+;;   kbb --backend sci scripts/mutation-check.cljk --network    (also the fetching branches)
 ;;
 ;; WHY THE REASON AND NOT THE COLOUR.
 ;; A negative test that asserts only "the run went red" counts a run that went

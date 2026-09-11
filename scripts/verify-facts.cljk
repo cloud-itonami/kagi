@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Re-checks every source in facts.edn against the live authority.
 ;;
-;;   nbb scripts/verify-facts.cljk                (from the repository root)
-;;   nbb scripts/verify-facts.cljk --facts <path>
-;;   nbb scripts/verify-facts.cljk --pace <ms>    (delay between page fetches)
+;;   kbb --backend sci scripts/verify-facts.cljk                (from the repository root)
+;;   kbb --backend sci scripts/verify-facts.cljk --facts <path>
+;;   kbb --backend sci scripts/verify-facts.cljk --pace <ms>    (delay between page fetches)
 ;;
 ;; Three exit codes, on purpose:
 ;;   0  every source checked out

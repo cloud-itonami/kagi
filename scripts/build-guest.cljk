@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Compile the Kotoba guest and emit it as an ES module the Worker can import.
 ;;
 ;; Two things this does that a bare `amu compile` does not:

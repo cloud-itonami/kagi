@@ -50,7 +50,7 @@ node ../../../scripts/resource-guard.mjs run build -- npm run build
 ```
 
 The guard is the workspace-wide rule that only one heavy build runs at a time
-(CLAUDE.md, resource governor). It exits **2** without starting yours when
+(AGENTS.md, resource governor). It exits **2** without starting yours when
 another build holds the lock — that is not your build failing, it is your build
 not having begun. Wait and repeat. Bare `npm run build` works too and is what
 the guard ultimately runs.
